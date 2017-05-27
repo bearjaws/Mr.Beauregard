@@ -1,0 +1,31 @@
+{
+  "name": "mr.beauregard",
+  "version": "1.0.0",
+  "description": "A tool for keeping you on task",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bearjaws/RemindMe.git"
+  },
+  "keywords": [
+    "reminder",
+    "remind-me",
+    "task",
+    "tracking"
+  ],
+  "author": "bearjaws",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/bearjaws/RemindMe/issues"
+  },
+  "homepage": "https://github.com/bearjaws/RemindMe#readme",
+  "dependencies": {
+    "bluebird": "^3.5.0",
+    "nedb": "^1.8.0",
+    "node-notifier": "^5.1.2",
+    "path": "^0.12.7"
+  }
+}
