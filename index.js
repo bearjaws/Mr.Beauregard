@@ -8,8 +8,11 @@ let Datastore = require('nedb')
     , nedb = new Datastore({ filename: dbPath, autoload: true, timestampData: true });
 
 
+let database = require('./database');
 nedb = bluebird.promisifyAll(nedb);
 nedb.persistence.setAutocompactionInterval(60000);
+let Database = new database(nedb);
+
 function notifierBaseConfig() {
     // Deep clone
     return JSON.parse(JSON.stringify({
@@ -21,26 +24,15 @@ function notifierBaseConfig() {
         timeout: 120
     }));
 }
-function recurringQuestion() {
-    console.log('notifiying');
-    notifier.notify({
 
-        actions: ['Test this thing', 'Write the other thing', 'Something new', 'one more time', 'time time time '],
-        timeout: 120
-    }, function (err, response) {
-        console.log(response);
-    });
-}
-
-let event = null;
-
-let test = nedb.findAsync({ '_id': 'setupComplete'}).then(async function(rows) {
+nedb.findAsync({ '_id': 'setupComplete'}).then(async function(rows) {
     console.log(rows);
     if (rows.length === 0) {
         firstRun();
     }
     let timing = await nedb.findAsync({ '_id': 'timing'});
     let tasks = await nedb.findAsync({ '_id': 'tasks'});
+    lastQuestion(timing, tasks);
 
 });
 // notifier.on('timeout', function (notifierObject, options) {
@@ -49,16 +41,48 @@ let test = nedb.findAsync({ '_id': 'setupComplete'}).then(async function(rows) {
 //     event = setTimeout(recurringQuestion, 30000);
 // });
 //
-// notifier.on('replied', function (notifierObject, options, response) {
-//     console.log(response);
-//     clearInterval(event);
-//     event = setTimeout(recurringQuestion, 600000);
-// });
-//
-// notifier.on('click', function(notifier, options, response) {
-//     console.log(arguments);
-// });
+notifier.on('replied', function (notifierObject, options, response) {
+    console.log(options);
+    console.log(response);
+    // clearInterval(event);
+    // event = setTimeout(recurringQuestion, 600000);
+});
 
+let clickHandlers = {
+  'Add a task': addTask
+};
+
+notifier.on('click', function(notifier, options, response) {
+    console.log(options);
+    console.log(options);
+    console.log(response.activationValue);
+    clickHandlers[response.activationValue](options, response);
+});
+
+
+function addTask(options, response) {
+    let config = notifierBaseConfig();
+    config.message = 'Brief description of the task';
+    config.closeLabel = 'Cancel';
+    config.reply = 'Description';
+    notifier.notify(config, function (err, options, response) {
+        console.log(response);
+    });
+}
+
+
+async function dbAddTask(response) {
+    const key = {
+        _id: 'tasks'
+    };
+    let tasks = nedb.findAsync(key);
+    console.log(tasks);
+    if (tasks.length === 0) {
+        tasks = {
+
+        }
+    }
+}
 
 async function firstRun() {
     let config = notifierBaseConfig();
@@ -76,22 +100,12 @@ async function firstRun() {
     });
 }
 
-function inquire(timing, tasks) {
-    let config = notifierBaseConfig();
-    config.message = 'What are you currently working on?';
-    config.reply = 'First task';
-
-}
-
 function lastQuestion(timing, tasks) {
     let config = notifierBaseConfig();
-    config.message = 'Anything else I can help you with?';
-    config.actions = ['Configure timing', 'Add another task', 'Remove a task'];
-    notifier.notify(config, function (err, response, test) {
-
-    });
-
-    }
+    config.message = 'What can I help you with?';
+    config.actions = ['Add a task', 'Remove a task', 'Configure timing'];
+    notifier.notify(config);
+}
 
 async function setTimeing(resolve) {
     let config = notifierBaseConfig();
@@ -125,18 +139,12 @@ async function setTimeing(resolve) {
         };
 
         try {
-            let current = await nedb.findAsync({'_id': 'timing'});
-            if (current.length !== 0) {
-               await nedb.updateAsync({ '_id': 'timing' }, { $set: timingConfig });
-            } else {
-                timingConfig._id = 'timing';
-                await nedb.insertAsync(timingConfig);
-                await nedb.insertAsync({
-                    '_id': 'setupComplete',
-                    'value': true
-                });
-                resolve();
-            }
+            await Database.upsertTiming(timingConfig);
+            await nedb.insertAsync({
+                '_id': 'setupComplete',
+                'value': true
+            });
+            resolve();
         } catch(err) {
             console.log(err);
             let config = notifierBaseConfig();
